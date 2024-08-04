@@ -68,7 +68,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ## Contact
 
-If you have any questions or feedback, please contact [Your Name] at [your.email@example.com].
+If you have any questions or feedback, please contact Kapil Kashyap at kapilkashyap3105@example.com.
 
 ## Acknowledgements
 
