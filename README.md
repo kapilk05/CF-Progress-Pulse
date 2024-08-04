@@ -1,4 +1,4 @@
-# Codeforces College Tracker
+# Codeforces Progress Pulse
 
 This Python script tracks and analyzes the performance of college students in Codeforces contests. It specifically focuses on identifying students from a particular college who have achieved rating changes or color upgrades.
 
