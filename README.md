@@ -13,7 +13,7 @@ This Python script tracks and analyzes the performance of college students in Co
 
 Before you begin, ensure you have met the following requirements:
 
-- Python 3.7+
+- Python 3.7
 - `requests` library
 
 ## Installation
