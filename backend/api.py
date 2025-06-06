@@ -4,20 +4,20 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import (
     JWTManager, create_access_token, jwt_required, get_jwt_identity
 )
-from flask_cors import CORS  # Import CORS
+from flask_cors import CORS
 import requests
 import time
 from datetime import datetime
 
 app = Flask(__name__)
 
-# Enable CORS globally on the app
-CORS(app)
+# Enable CORS for all origins and credentials
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 # --- Configurations ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'  # for demo; replace for prod
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Change this in production!
+app.config['JWT_SECRET_KEY'] = 'your-secret-key'
 
 # --- Initialize extensions ---
 db = SQLAlchemy(app)
@@ -40,7 +40,7 @@ class User(db.Model):
 
 class Account(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    platform = db.Column(db.String(50), nullable=False)  # e.g., codeforces, leetcode
+    platform = db.Column(db.String(50), nullable=False)
     handle = db.Column(db.String(100), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -55,6 +55,8 @@ def register():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
+    leetcode = data.get('leetcode_profile')
+
     if not email or not password:
         return jsonify({'msg': 'Email and password required'}), 400
     if User.query.filter_by(email=email).first():
@@ -64,7 +66,14 @@ def register():
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    return jsonify({'msg': 'User created successfully'}), 201
+
+    if leetcode:
+        leetcode_account = Account(platform='leetcode', handle=leetcode, user_id=user.id)
+        db.session.add(leetcode_account)
+        db.session.commit()
+
+    access_token = create_access_token(identity=str(user.id))
+    return jsonify({'msg': 'User created successfully', 'access_token': access_token}), 201
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -89,7 +98,6 @@ def add_account():
     if not platform or not handle:
         return jsonify({'msg': 'Platform and handle required'}), 400
 
-    # Check if already added
     existing = Account.query.filter_by(user_id=user_id, platform=platform, handle=handle).first()
     if existing:
         return jsonify({'msg': 'Account already added'}), 400
@@ -113,7 +121,7 @@ def get_accounts():
         })
     return jsonify({'accounts': result})
 
-# --- Existing Contest Pulse Code (unchanged) ---
+# --- Contest Pulse Logic ---
 def getContestStandings(contestID):
     url = f"https://codeforces.com/api/contest.ratingChanges?contestId={contestID}"
     response = requests.get(url)
@@ -262,6 +270,23 @@ def pulse():
 @app.route('/test')
 def test():
     return "API is working"
+
+@app.route('/api/current_user', methods=['GET'])
+@jwt_required()
+def current_user():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'msg': 'User not found'}), 404
+
+    return jsonify({
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'name': user.email.split('@')[0].capitalize(),
+            'avatarUrl': f'https://api.dicebear.com/7.x/bottts/svg?seed={user.email}'
+        }
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)
