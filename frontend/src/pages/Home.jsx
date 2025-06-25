@@ -1,14 +1,12 @@
 import React, { useState, useContext, useEffect } from 'react';
 import styled from 'styled-components';
 import { ThemeContext } from '../components/ThemeContext';
-import { AuthContext } from '../components/AuthContext'; // Add AuthContext import
+import { AuthContext } from '../components/AuthContext';
 import axios from 'axios';
-import Switch from '../Switch';
-import Navbar from '../components/Navbar';
 
 const Home = () => {
-  const { isDark, toggleTheme } = useContext(ThemeContext);
-  const { user } = useContext(AuthContext); // Get user from AuthContext
+  const { isDark } = useContext(ThemeContext);
+  const { user } = useContext(AuthContext);
 
   const [contestId, setContestId] = useState('');
   const [userStats, setUserStats] = useState(null);
@@ -19,7 +17,6 @@ const Home = () => {
   const [emailErrors, setEmailErrors] = useState({});
   const [reminderSuccess, setReminderSuccess] = useState(null);
 
-  // For profile stats
   const [profileStats, setProfileStats] = useState({
     codechef: null,
     codeforces: null,
@@ -28,24 +25,23 @@ const Home = () => {
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState(null);
 
-  // Fetch contest user stats by contest ID
   const fetchUserStats = async () => {
     if (!/^\d+$/.test(contestId)) {
       setEmailErrors({ input: 'Please enter a valid contest ID (numbers only).' });
       return;
     }
     try {
-      const res = await axios.post('http://localhost:5000/get_users_by_contest', {
-        contest_id: contestId,
+      const res = await axios.post('http://localhost:5000/api/pulse', {
+        contestId: parseInt(contestId),
       });
-      setUserStats(res.data);
+      setUserStats(res.data.data || []);
       setEmailErrors({});
     } catch (err) {
       console.error('Error fetching user stats:', err);
+      setUserStats([]);
     }
   };
 
-  // Fetch upcoming contests from Codeforces API
   const fetchUpcomingContests = async () => {
     try {
       const res = await axios.get('https://codeforces.com/api/contest.list');
@@ -58,7 +54,6 @@ const Home = () => {
     }
   };
 
-  // Set reminder for contest
   const handleReminder = async (contest) => {
     if (!email || !email.includes('@')) {
       setEmailErrors({ reminder: 'Enter a valid email.' });
@@ -82,22 +77,16 @@ const Home = () => {
     }
   };
 
-  // Fetch profile stats based on user handles from profile
   const fetchProfileStats = async () => {
     if (!user) return;
     setLoadingStats(true);
     setStatsError(null);
-
     try {
       const { codechefHandle, codeforcesHandle, leetcodeHandle } = user;
-
-      // We'll fetch separately for each platform if handle exists
       const results = {};
 
       if (codechefHandle) {
         try {
-          // Example: Fetch codechef stats (replace with your backend/api)
-          // For demo, we simulate API call:
           const res = await axios.get(`https://competitive-coding-api.herokuapp.com/api/codechef/${codechefHandle}`);
           results.codechef = res.data;
         } catch {
@@ -116,9 +105,6 @@ const Home = () => {
 
       if (leetcodeHandle) {
         try {
-          // No official public API, so you may need your own backend or a third-party API
-          // Here just simulate success/failure
-          // You can replace this with your API call to get LeetCode stats
           const res = await axios.get(`https://leetcode-stats-api.herokuapp.com/${leetcodeHandle}`);
           results.leetcode = res.data;
         } catch {
@@ -142,7 +128,6 @@ const Home = () => {
   }, [user]);
 
   if (!user) {
-    // User not logged in → Show About Us
     return (
       <Wrapper>
         <AboutUsContainer isDark={isDark}>
@@ -159,50 +144,22 @@ const Home = () => {
     );
   }
 
-  // User is logged in → Show main dashboard layout
   return (
-    <>
-      <Wrapper>
-        <MainContent>
-          <LeftPane isDark={isDark}>
-            <h2>User Stats by Contest</h2>
-            <Input
-              placeholder="Enter Contest ID"
-              value={contestId}
-              onChange={(e) => setContestId(e.target.value)}
-              type="number"
-            />
-            {emailErrors.input && <ErrorText>{emailErrors.input}</ErrorText>}
-            <FetchButton onClick={fetchUserStats}>Get Contest Stats</FetchButton>
-
-            {userStats && (
-              <StatsList>
-                {userStats.map((user, idx) => (
-                  <li key={idx}>
-                    {user.handle} — Rank: {user.rank} — ΔRating: {user.ratingChange}
-                  </li>
-                ))}
-              </StatsList>
-            )}
-          </LeftPane>
-
-          {/* New profile stats div below the left pane */}
+    <Wrapper>
+      <MainContent>
+        <LeftPaneWrapper>
           <ProfileStatsPane isDark={isDark}>
             <h2>Your Coding Profiles</h2>
             {loadingStats && <p>Loading your profile stats...</p>}
             {statsError && <ErrorText>{statsError}</ErrorText>}
-
             {!loadingStats && !statsError && (
               <>
-                {/* Check if user has added any handles */}
                 {!user.codechefHandle && !user.codeforcesHandle && !user.leetcodeHandle && (
                   <AddHandlesPrompt>
                     Please add your CodeChef, Codeforces, and LeetCode handles in your{' '}
                     <a href="/profile">profile</a> to see your stats here.
                   </AddHandlesPrompt>
                 )}
-
-                {/* Show CodeChef stats */}
                 {user.codechefHandle && (
                   <ProfileCard>
                     <h3>CodeChef - {user.codechefHandle}</h3>
@@ -217,8 +174,6 @@ const Home = () => {
                     )}
                   </ProfileCard>
                 )}
-
-                {/* Show Codeforces stats */}
                 {user.codeforcesHandle && (
                   <ProfileCard>
                     <h3>Codeforces - {user.codeforcesHandle}</h3>
@@ -234,8 +189,6 @@ const Home = () => {
                     )}
                   </ProfileCard>
                 )}
-
-                {/* Show LeetCode stats */}
                 {user.leetcodeHandle && (
                   <ProfileCard>
                     <h3>LeetCode - {user.leetcodeHandle}</h3>
@@ -256,83 +209,104 @@ const Home = () => {
             )}
           </ProfileStatsPane>
 
-          <RightPane isDark={isDark}>
-            <h2>Upcoming Contests</h2>
-            <ScrollContainer>
-              <ScrollingList>
-                {upcomingContests.map((contest, idx) => (
-                  <ContestCard
-                    key={contest.id}
-                    onMouseEnter={() => setHoveredIndex(idx)}
-                    onMouseLeave={() => setHoveredIndex(null)}
-                    style={{
-                      transform: hoveredIndex === idx ? 'scale(1.05)' : 'scale(1)',
-                      transition: 'transform 0.3s ease',
-                    }}
-                    onClick={() =>
-                      window.open(`https://codeforces.com/contest/${contest.id}`, '_blank')
-                    }
-                  >
-                    <strong>{contest.name}</strong>
-                    <div>
-                      Starts at:{' '}
-                      {new Date(contest.startTimeSeconds * 1000).toLocaleString()}
-                    </div>
-                    <div>
-                      Duration: {Math.floor(contest.durationSeconds / 3600)}h{' '}
-                      {Math.floor((contest.durationSeconds % 3600) / 60)}m
-                    </div>
-                    <ReminderButton
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReminderIndex(idx === reminderIndex ? null : idx);
-                        setEmailErrors({});
-                        setReminderSuccess(null);
-                        setEmail('');
-                      }}
-                    >
-                      Set Reminder
-                    </ReminderButton>
-
-                    {reminderIndex === idx && (
-                      <ReminderForm onClick={(e) => e.stopPropagation()}>
-                        <ReminderInput
-                          type="email"
-                          placeholder="Enter your email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                        <ReminderButton
-                          type="button"
-                          onClick={() => handleReminder(contest)}
-                        >
-                          Set Reminder
-                        </ReminderButton>
-                        {emailErrors.reminder && <ErrorText>{emailErrors.reminder}</ErrorText>}
-                        {reminderSuccess && <SuccessText>{reminderSuccess}</SuccessText>}
-                      </ReminderForm>
-                    )}
-                  </ContestCard>
+          <ContestStatsPane isDark={isDark}>
+            <h2>User Stats by Contest</h2>
+            <Input
+              placeholder="Enter Contest ID"
+              value={contestId}
+              onChange={(e) => setContestId(e.target.value)}
+              type="number"
+            />
+            {emailErrors.input && <ErrorText>{emailErrors.input}</ErrorText>}
+            <FetchButton onClick={fetchUserStats}>Get Contest Stats</FetchButton>
+            {userStats && userStats.length > 0 ? (
+              <StatsList>
+                {userStats.map((user, idx) => (
+                  <ContestUserCard key={idx}>
+                    <Handle>{user.handle}</Handle>
+                    <Ratings>
+                      <span>Old: <Rating>{user.oldRating}</Rating></span>
+                      <span>New: <Rating>{user.newRating}</Rating></span>
+                    </Ratings>
+                    <ChangeTag>{user.colorChange}</ChangeTag>
+                  </ContestUserCard>
                 ))}
-              </ScrollingList>
-            </ScrollContainer>
-          </RightPane>
-        </MainContent>
-      </Wrapper>
-    </>
+              </StatsList>
+            ) : userStats ? (
+              <p>No users from your college upgraded ranks in this contest.</p>
+            ) : null}
+          </ContestStatsPane>
+        </LeftPaneWrapper>
+
+        <RightPane isDark={isDark}>
+          <h2>Upcoming Contests</h2>
+          <ScrollContainer>
+            <ScrollingList>
+              {upcomingContests.map((contest, idx) => (
+                <ContestCard
+                  key={contest.id}
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  style={{
+                    transform: hoveredIndex === idx ? 'scale(1.05)' : 'scale(1)',
+                    transition: 'transform 0.3s ease',
+                  }}
+                  onClick={() =>
+                    window.open(`https://codeforces.com/contest/${contest.id}`, '_blank')
+                  }
+                >
+                  <strong>{contest.name}</strong>
+                  <div>
+                    Starts at: {new Date(contest.startTimeSeconds * 1000).toLocaleString()}
+                  </div>
+                  <div>
+                    Duration: {Math.floor(contest.durationSeconds / 3600)}h{' '}
+                    {Math.floor((contest.durationSeconds % 3600) / 60)}m
+                  </div>
+                  <ReminderButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setReminderIndex(idx === reminderIndex ? null : idx);
+                      setEmailErrors({});
+                      setReminderSuccess(null);
+                      setEmail('');
+                    }}
+                  >
+                    Set Reminder
+                  </ReminderButton>
+                  {reminderIndex === idx && (
+                    <ReminderForm onClick={(e) => e.stopPropagation()}>
+                      <ReminderInput
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                      <ReminderButton type="button" onClick={() => handleReminder(contest)}>
+                        Set Reminder
+                      </ReminderButton>
+                      {emailErrors.reminder && <ErrorText>{emailErrors.reminder}</ErrorText>}
+                      {reminderSuccess && <SuccessText>{reminderSuccess}</SuccessText>}
+                    </ReminderForm>
+                  )}
+                </ContestCard>
+              ))}
+            </ScrollingList>
+          </ScrollContainer>
+        </RightPane>
+      </MainContent>
+    </Wrapper>
   );
 };
 
 export default Home;
 
-// ---------------- Styled Components ----------------
+// ---------- Styled Components (ADD NEW ONES BELOW) ----------
 
 const Wrapper = styled.div`
   background: ${({ theme }) => theme.background};
   color: ${({ theme }) => theme.color};
   min-height: 100vh;
-  transition: all 0.3s ease;
-  position: relative;
   padding: 40px;
 `;
 
@@ -343,7 +317,7 @@ const AboutUsContainer = styled.div`
   padding: 40px;
   border-radius: 16px;
   box-shadow: 0 0 10px rgba(0,0,0,0.1);
-  color: ${({ isDark }) => (isDark ? 'black' : 'black')};
+  color: black;
   text-align: center;
 
   a {
@@ -361,49 +335,48 @@ const MainContent = styled.div`
   gap: 40px;
 `;
 
-const LeftPane = styled.div`
-  flex: 7;
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.05);
-  max-height: 280px;  /* reduce height to make room for below */
-
-  /* Headings black in dark mode */
-  h2 {
-    color: ${({ isDark }) => (isDark ? 'black' : '#000')};
-  }
+const LeftPaneWrapper = styled.div`
+  flex: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 `;
 
 const ProfileStatsPane = styled.div`
-  flex: 7;
   background: #ffffff;
-  margin-top: 20px;
   padding: 20px;
   border-radius: 16px;
   box-shadow: 0 0 10px rgba(0,0,0,0.05);
-  max-height: 320px;
+  flex: 1;
+  max-height: 340px;
   overflow-y: auto;
 
-  /* Headings black in dark mode */
   h2 {
     color: ${({ isDark }) => (isDark ? 'black' : '#000')};
     margin-bottom: 12px;
   }
 `;
 
-const RightPane = styled.div`
-  flex: 3;
+const ContestStatsPane = styled.div`
   background: #ffffff;
   padding: 20px;
   border-radius: 16px;
-  overflow: hidden;
-  height: 640px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  flex: 1;
+  max-height: 360px;
+  overflow-y: auto;
 
-  /* Headings black in dark mode */
   h2 {
     color: ${({ isDark }) => (isDark ? 'black' : '#000')};
   }
+`;
+
+const RightPane = styled.div`
+  flex: 4;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 16px;
+  height: 640px;
 `;
 
 const Input = styled.input`
@@ -427,16 +400,48 @@ const FetchButton = styled.button`
   cursor: pointer;
 `;
 
-const StatsList = styled.ul`
+const StatsList = styled.div`
   margin-top: 15px;
-  padding-left: 20px;
   font-size: 14px;
 `;
 
+const ContestUserCard = styled.div`
+  background: #f1f1f1;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+`;
+
+const Handle = styled.h4`
+  margin: 0 0 4px 0;
+  color: #333;
+`;
+
+const Ratings = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 6px;
+`;
+
+const Rating = styled.span`
+  font-weight: bold;
+  color: #007bff;
+`;
+
+const ChangeTag = styled.div`
+  display: inline-block;
+  background-color: #28a745;
+  color: white;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+`;
+
 const ScrollContainer = styled.div`
-  height: 320px;
+  height: 600px;
   overflow: hidden;
-  position: relative;
 `;
 
 const ScrollingList = styled.div`
